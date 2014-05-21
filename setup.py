@@ -17,6 +17,8 @@ if sys.argv[-1] == 'publish':
 readme = open('README.rst').read()
 history = open('HISTORY.rst').read().replace('.. :changelog:', '')
 
+module1 = Extension('analytical', sources = ['analytical_c.c'])
+
 setup(
     name='pas',
     version='0.1.0',
@@ -48,4 +50,5 @@ setup(
         'Programming Language :: Python :: 3.3',
     ],
     test_suite='tests',
+    ext_modules = [module1], 
 )

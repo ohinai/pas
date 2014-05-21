@@ -5,9 +5,10 @@ import sys
 sys.path.append(pas_absolute_path)
 
 import pas.buckley_leverett as bl
+import numpy as np
 
-krw=lambda se:se 
-kro=lambda se:(1.-se)
+krw=lambda se:se**2 
+kro=lambda se:(1.-se)**2
 
 water_viscosity = 1.e-4
 oil_viscosity = 1.e-4
@@ -26,5 +27,5 @@ sol = bl.buckley_leverett(2.,
                           porosity=1.)
 
 
-for x in range(10):
+for x in np.arange(0, 5., .1):
     print x, sol(x)
