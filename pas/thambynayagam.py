@@ -9,7 +9,11 @@ import itertools
 import analytical
 
 
-def analytical_solution_d(args):
+def analytical_solution_d(centroid, t_in,
+                          x_well, y_well, z_well, 
+                          n_x, n_y, n_z, 
+                          a, b, d, 
+                          n_max, m_max, w_max):
     """ Computes the analytical solution for 
     all Dirichlet boundary conditions. 
     """
@@ -17,7 +21,7 @@ def analytical_solution_d(args):
     x_well, y_well, z_well, 
     n_x, n_y, n_z, 
     a, b, d, 
-    n_max, m_max, w_max) = args
+    n_max, m_max, w_max)
                           
     x_in = centroid[0]
     y_in = centroid[1]
@@ -37,16 +41,14 @@ def analytical_solution_d(args):
     
     return pressure
 
-def analytical_solution_n(args):
+def analytical_solution_n(centroid, t_in,
+                          x_well, y_well, z_well, 
+                          n_x, n_y, n_z, 
+                          a, b, d, 
+                          n_max, m_max, w_max):
     """ Computes the analytical solution for 
     all Neumann boundary conditions. 
     """
-    (centroid, t_in,
-    x_well, y_well, z_well, 
-    n_x, n_y, n_z, 
-    a, b, d, 
-    n_max, m_max, w_max) = args
-                          
     x_in = centroid[0]
     y_in = centroid[1]
     z_in = centroid[2]

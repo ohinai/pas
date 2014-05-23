@@ -7,6 +7,9 @@ sys.path.append(pas_absolute_path)
 import pas.buckley_leverett as bl
 import numpy as np
 
+
+case1 = bl.BuckleyLeverett()
+
 krw=lambda se:se**2 
 kro=lambda se:(1.-se)**2
 
@@ -18,14 +21,8 @@ def fractional_flow(water_saturation):
     ff_value /= ff_value+kro(water_saturation)/oil_viscosity
     return ff_value
 
-sol = bl.buckley_leverett(2., 
-                          fractional_flow = fractional_flow, 
-                          residual_water = .2, 
-                          residual_oil = .0, 
-                          A=1., 
-                          injection_rate=1., 
-                          porosity=1.)
-
+case1.fractional_flow = fractional_flow
+sol = case1.water_saturation_solution(2.)
 
 for x in np.arange(0, 5., .1):
     print x, sol(x)

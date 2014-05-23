@@ -10,6 +10,8 @@ try:
 except ImportError:
     from distutils.core import setup
 
+from distutils.core import Extension
+
 if sys.argv[-1] == 'publish':
     os.system('python setup.py sdist upload')
     sys.exit()
@@ -17,7 +19,7 @@ if sys.argv[-1] == 'publish':
 readme = open('README.rst').read()
 history = open('HISTORY.rst').read().replace('.. :changelog:', '')
 
-module1 = Extension('analytical', sources = ['analytical_c.c'])
+module1 = Extension('analytical', sources = ['pas/c_source/analytical_c.c'])
 
 setup(
     name='pas',
