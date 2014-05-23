@@ -1,12 +1,6 @@
 
-import os
-pas_absolute_path = os.path.abspath("../")
-import sys 
-sys.path.append(pas_absolute_path)
-
 import pas.buckley_leverett as bl
 import numpy as np
-
 
 case1 = bl.BuckleyLeverett()
 

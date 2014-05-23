@@ -11,9 +11,11 @@ class BuckleyLeverett():
     :ivar float injection_rate: Well water injection rate (kg/s). 
     :ivar float residual_water: Residual water saturation. 
     :ivar float residual_oil: Residual oil saturation. 
-    :ivar function fractional_flow: Fractional flow as a function of water satuation. 
-    :ivar function df_ds_function: Derivative of fractional flow with respect to saturation (optional). \
-    if not specified, the program will compute a numerical derivative of fractional_flow. 
+    :ivar function fractional_flow: Fractional flow as a function \
+    of water satuation. 
+    :ivar function df_ds_function: Derivative of fractional flow with \
+    respect to saturation (optional). If not specified, the program \
+    will compute a numerical derivative of fractional_flow. 
     """
 
     def __init__(self):

@@ -19,6 +19,8 @@ class TestBuckleyLeverett(unittest.TestCase):
 
     def test_bl(self):
 
+        case1 = bl.BuckleyLeverett()
+
         krw=lambda se:se
         kro=lambda se:(1.-se)
 
@@ -30,13 +32,8 @@ class TestBuckleyLeverett(unittest.TestCase):
             ff_value /= ff_value+kro(water_saturation)/oil_viscosity
             return ff_value
 
-        sol = bl.buckley_leverett(1., 
-                                  fractional_flow = fractional_flow, 
-                                  residual_water = .2, 
-                                  residual_oil = .0, 
-                                  A=1., 
-                                  injection_rate=1., 
-                                  porosity=1.)
+        case1.fractional_flow = fractional_flow
+        sol = case1.water_saturation_solution(2.)
         
     def tearDown(self):
         pass
