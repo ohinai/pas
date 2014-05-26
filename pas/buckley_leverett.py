@@ -20,9 +20,9 @@ class BuckleyLeverett():
     and finally it will construct fractional_flow from the relative permeability and 
     fluid viscosities. 
     
-    :ivar float height: Domain height (m). 
+    :ivar float cross_section: Domain cross sectional area (m^2). 
     :ivar float length: Domain length (m). 
-    :ivar float injection_rate: Well water injection rate (kg/s). 
+    :ivar float injection_rate: Well water injection rate (m^3/s). 
     :ivar float residual_water: Residual water saturation. 
     :ivar float residual_oil: Residual oil saturation. 
     :ivar function fractional_flow: Fractional flow as a function \
@@ -34,8 +34,8 @@ class BuckleyLeverett():
 
     def __init__(self):
         
-        ## Domain height (m). 
-        self.height = 1.
+        ## Domain cross sectional area (m^2). 
+        self.cross_section = 1.
 
         ## Domain length (m)
         self.length = 1.
@@ -43,7 +43,7 @@ class BuckleyLeverett():
         ## Rock porosity. 
         self.porosity = 1.
         
-        ## Injection rate (kg/s). 
+        ## Injection rate (m^3/s). 
         self.injection_rate = 1.
 
         ## Minimum water residual. 
@@ -104,7 +104,7 @@ class BuckleyLeverett():
 
         f_prime_max = fractional_flow_prime(sw_max)
 
-        v = time*self.injection_rate/(self.porosity*self.height)
+        v = time*self.injection_rate/(self.porosity*self.cross_section)
         x_front = v*fractional_flow_prime(sw_max)
 
         # Compute sw as a function of x. This is done by 
