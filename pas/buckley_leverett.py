@@ -78,7 +78,6 @@ class BuckleyLeverett():
         plt.plot(x, y, 'k')
         plt.show()
         
-        
 
     def water_saturation_solution(self, time):
         """ Returns a function based on the  Buckley-Leverett solution 
