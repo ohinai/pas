@@ -4,8 +4,8 @@ import numpy as np
 
 case1 = bl.BuckleyLeverett()
 
-krw=lambda se:se**2 
-kro=lambda se:(1.-se)**2
+krw=lambda sw:sw**2 
+kro=lambda sw:(1.-sw)**2
 
 water_viscosity = 1.e-4
 oil_viscosity = 1.e-4
@@ -16,7 +16,12 @@ def fractional_flow(water_saturation):
     return ff_value
 
 case1.fractional_flow = fractional_flow
+case1.length = 5.
+
 sol = case1.water_saturation_solution(2.)
 
-for x in np.arange(0, 5., .1):
+for x in np.arange(0., 5., .1):
     print x, sol(x)
+
+case1.plot_water_saturation_at_t(1.)
+case1.plot_water_saturation_at_t(2.)
