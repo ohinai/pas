@@ -20,8 +20,8 @@ The best way to get the code right now is to clone the git repo and run the setu
 
 
     .. code-block:: bash
-    $git clone https://github.com/ohinai/pas.git
-    $python setup.py develop
+        $ git clone https://github.com/ohinai/pas.git
+        $ python setup.py develop
 
 
 
