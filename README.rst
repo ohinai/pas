@@ -12,9 +12,9 @@ on their own for research and engineering calculations.
 
 The code is still in early development. The current solutions available are:
 
-* The Buckley-Leverett solution for water-flooding problems. 
+* The Buckley-Leverett solution for two-phase water-flooding problems. 
 * The Cinco-Ley Meng solution for finite conductivity fracture problem.
-* One of the Thambynagam analytical solution to the diffusion problem over a bounded square domain.
+* The Thambynagam analytical solution to the diffusion problem over a bounded square domain.
 
 The best way to get the code right now is to clone the git repo and run the setup utility:
 
@@ -22,12 +22,7 @@ The best way to get the code right now is to clone the git repo and run the setu
     .. code-block:: bash
     
         $ git clone https://github.com/ohinai/pas.git
-        $ python setup.py develop
-
-
-
-
-
+        $ python setup.py install 
 
 
 * Free software: BSD license
