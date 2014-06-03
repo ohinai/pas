@@ -7,28 +7,20 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Polygon
 
 
-def rescale_relative_perm(k_r, residual_water, residual_oil):
+def rescale_relative_perm(k_r, residual_w, residual_n):
     """ Takes a relative permeability function from [0,1] and 
-    rescales it to [residual_water, 1-residual_oil]. 
+    rescales it to [residual_w, 1-residual_n]. 
     """
     def new_k_r(sw):
-        se = sw-residual_water 
-        se /= 1.-residual_water-residual_oil
+        se = sw-residual_w 
+        se /= 1.-residual_w-residual_n
         return k_r(se)
 
     return new_k_r
 
 class BuckleyLeverett():
     """ Solves the two-phase flow problem using the Buckley-Leverett 
-    solution. The code provides three methods for providing the 
-    specifying the fractional flow:
-    1) df_ds (highest priority): Directly provide the derivative of \
-    the fractional flow \
-    function with respect to saturation. 
-    2) fractional_flow: Provide the fractinal flow function. 
-    3) k_ro, k_rw, oil_viscosity, water_viscosity: Provide the \
-    variables and functions 
-    that make up the fractional flow function. 
+    solution. 
 
     The code first looks for a df_ds function, finding none is looks 
     for fractional_flow, and finally it will construct fractional_flow 
@@ -36,14 +28,9 @@ class BuckleyLeverett():
     
     :ivar float cross_section: Domain cross sectional area (m^2). 
     :ivar float length: Domain length (m). 
-    :ivar float injection_rate: Well water injection rate (m^3/s). 
-    :ivar float residual_water: Residual water saturation. 
-    :ivar float residual_oil: Residual oil saturation. 
-    :ivar function fractional_flow: Fractional flow as a function \
-    of water satuation (optional). 
-    :ivar function df_ds_function: Derivative of fractional flow with \
-    respect to saturation (optional). If not specified, the program \
-    will compute a numerical derivative of fractional_flow. 
+    :ivar float injection_rate: Injection rate (m^3/s). 
+    :ivar float residual_w: Residual saturation for wetting phase. 
+    :ivar float residual_n: Residual saturation for non-wetting phase. 
     """
 
     def __init__(self):
@@ -60,31 +47,24 @@ class BuckleyLeverett():
         ## Injection rate (m^3/s). 
         self.injection_rate = 1.
 
-        ## Minimum water residual. 
-        self.residual_water = 0.
+        ## Minimum wetting phase residual. 
+        self.residual_w = 0.
         
-        ## Minimum oil residual. 
-        self.residual_oil = 0.
+        ## Minimum non-wetting phase residual. 
+        self.residual_n = 0.
         
-        ## Oil relative permeability
-        self.k_ro = None
+        ## Non-wetting phase relative permeability
+        self.k_rn = None
 
-        ## Water relative permeability
+        ## Wetting phase relative permeability
         self.k_rw = None 
         
-        ## Oil viscosity
-        self.oil_viscosity = 1.e-3
+        ## Non-wetting viscosity
+        self.viscosity_n = 1.e-3
 
-        ## Water viscosity
-        self.water_viscosity = 1.e-3
+        ## Wetting viscosity
+        self.viscosity_w = 1.e-3
 
-        ## Fractional flow as a function of water satuation ('function' type). 
-        self.fractional_flow = None
-
-        ## Derivative of fractional flow with respect to saturation ('function' type). 
-        self.df_ds_function = None
-
-    
 
     def find_df_ds_max_by_intergration(self, df_ds):
         """ Find df_ds max using the original method 
@@ -97,14 +77,13 @@ class BuckleyLeverett():
         ## Find the half-way point on the curve, the point 
         ## at which is starts decreasing. This point 
         ## is located by finding the max value of df_ds. 
-
         dx = .0001
         (fw_mid, sw_mid) = max([(df_ds(sw), sw) for \
-                                            sw in np.arange(self.residual_water+1.e-12, 
-                                                            1.-self.residual_oil, 
+                                            sw in np.arange(self.residual_w+1.e-12, 
+                                                            1.-self.residual_n, 
                                                             dx)])
-        df_ds_data = [(df_ds(sw), sw) for sw in np.arange(self.residual_water+1.e-12, 
-                                                          1.-self.residual_oil, 
+        df_ds_data = [(df_ds(sw), sw) for sw in np.arange(self.residual_w+1.e-12, 
+                                                          1.-self.residual_n, 
                                                           dx)]
                                           
         def find_difference_in_volume(f_prime_max):
@@ -138,8 +117,6 @@ class BuckleyLeverett():
                     sw1 = current_sw1
                     sw2 = current_sw2
                     
-        print current_sw
-
         fig, ax = plt.subplots()
 
         plt.plot([x[1] for x in df_ds_data], [x[0] for x in df_ds_data], 'k')
@@ -158,74 +135,111 @@ class BuckleyLeverett():
         plt.grid(True)
         plt.show()
 
-    def plot_water_saturation_at_t(self, time):
+    def plot_saturation_at_t(self, time):
+        """
+        """
+        (solution, front)= self.saturation_solution(time)
+
+        print "front", front
         
-        x = np.linspace(0., self.length, 100)
-        solution = self.water_saturation_solution(time)
-        y = [solution(x_i) for x_i in x]
-        
+        if front < self.length:
+            x = [x/100.*front for x in range(100)]+[front]
+            y = [solution(x_i) for x_i in x]
+            x += [front]
+            y += [0.]
+            x += [self.length]
+            y += [0.]
+
+        else:
+            x = [x/100.*self.length for x in range(100)]+[self.length]
+            y = [solution(x_i) for x_i in x]
+            
         plt.plot(x, y, 'k')
         plt.show()
 
-    def plot_fractional_flow(self):
-
-        x = np.linspace(self.residual_water, 1.-self.residual_oil, 100)
-        y = [self.fractional_flow(x_i) for x_i in x]
-        
+    def plot_fractional_flow(self, show_sw_at_front = False):
+        """
+        """
+        fractional_flow = self.construct_fractional_flow()
+        x = np.linspace(self.residual_w+1.e-3, 1.-self.residual_n, 100)
+        y = [fractional_flow(x_i) for x_i in x]
         plt.plot(x, y, 'k')
+
+        if show_sw_at_front:
+            fractional_flow_prime = self.construct_fractional_flow_prime()
+            sw_at_front = self.sw_at_front(fractional_flow, fractional_flow_prime)
+            plt.plot([sw_at_front], [fractional_flow(sw_at_front)], "ro")
+        
         plt.show()
         
+    def sw_at_front(self, fractional_flow, fractional_flow_prime):
+        """ Find the saturation at the front. 
+        """
+        (_, sw_at_front) = min(map(lambda sw:(abs(fractional_flow_prime(sw)-fractional_flow(sw)/sw), sw), 
+                                   np.arange(self.residual_w+.01, 
+                                             1.-self.residual_n, 
+                                             .0001)))
+        return sw_at_front
 
-    def water_saturation_solution(self, time):
-        """ Returns a function based on the  Buckley-Leverett solution 
-        for two-phase problems. The functions gives the water saturation 
-        at the time (s) specified in the input. 
+    def construct_fractional_flow(self):
+        """ Builds fractional flow function from 
+        parameters of problem. 
+        """
+        def fractional_flow(sw):
+            return 1./(1.+self.k_rn(sw)/self.k_rw(sw)*\
+                           self.viscosity_n/self.viscosity_w)
+        return fractional_flow
+
+    def construct_fractional_flow_prime(self):
+        """ Builds fractional flow  derivative function from 
+        parameters of problem. 
+        """
+        fractional_flow = self.construct_fractional_flow()
+        
+        def fractional_flow_prime(sw):
+            f_prime = fractional_flow(sw+.0001)
+            f_prime -=fractional_flow(sw)
+            f_prime /= .0001
+            return f_prime
+    
+        return fractional_flow_prime
+
+    def saturation_solution(self, time):
+        """ Returns the Buckley-Leverett solution 
+        for two-phase problems. The functions gives the wetting phase 
+        saturation at the time (s) specified in the input. 
         :param float time: Time (s) after injection.
-        :return: A function representing the water saturation at x \
+        :return: A function representing the wetting phase saturation at x \
         (distance from injector in meters). 
         """
-        if self.df_ds_function is None:
-            if self.fractional_flow is None:
-                def fractional_flow(sw):
-                    return 1./(1.+self.k_ro(sw)/self.k_rw(sw)*\
-                                   self.oil_viscosity/self.water_viscosity)
-                self.fractional_flow = fractional_flow
-            def fractional_flow_prime(water_saturation):
-                fw_prime = self.fractional_flow(water_saturation+.0001)
-                fw_prime -=self.fractional_flow(water_saturation)
-                fw_prime /= .0001
-                return fw_prime
-        else:
-            fractional_flow_prime = self.df_ds_function
+        fractional_flow = self.construct_fractional_flow()
+        fractional_flow_prime = self.construct_fractional_flow_prime()
 
-        (_, sw_max) = min(map(lambda sw:(abs(fractional_flow_prime(sw)-self.fractional_flow(sw)/sw), sw), 
-                              np.arange(self.residual_water+.01, 
-                                        1.-self.residual_oil, 
-                                        .0001)))
-        print "sw_max", sw_max
+        sw_at_front = self.sw_at_front(fractional_flow, fractional_flow_prime)
 
-        f_prime_max = fractional_flow_prime(sw_max)
+        fractional_flow_prime_at_front = fractional_flow_prime(sw_at_front)
 
         v = time*self.injection_rate/(self.porosity*self.cross_section)
-        x_front = v*fractional_flow_prime(sw_max)
+        
+        x_front = v*fractional_flow_prime(sw_at_front)
 
         # Compute sw as a function of x. This is done by 
         # interpolating over sw, and finding f_prime, 
         # then scaling f_prime properly to cover x. 
-        inter_y = [1.-self.residual_oil]+list(np.arange(1.-self.residual_oil, sw_max, -.001))+[sw_max]
+        inter_y = [1.-self.residual_n]+list(np.arange(1.-self.residual_n, sw_at_front, -.001))+[sw_at_front]
         inter_x = [0.]
         inter_x += map(lambda sw: fractional_flow_prime(sw), 
-                      np.arange(1.-self.residual_oil, sw_max, -.001))
-        inter_x += [fractional_flow_prime(sw_max)]
-        inter_x = map(lambda x:x/f_prime_max*x_front, inter_x)
+                      np.arange(1.-self.residual_n, sw_at_front, -.001))
+        inter_x += [fractional_flow_prime(sw_at_front)]
+        inter_x = map(lambda x:x/fractional_flow_prime_at_front*x_front, inter_x)
 
         saturation_before_front = interpolate.interp1d(inter_x, inter_y)
 
         def bl_solution(point):
-            if point<x_front:
+            if point<=x_front:
                 return saturation_before_front(point)
             else:
                 return 0.
 
-        return bl_solution
+        return (bl_solution, x_front)
 

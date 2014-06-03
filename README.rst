@@ -30,4 +30,4 @@ The best way to get the code right now is to clone the git repo and run the setu
 Features
 --------
 
-* TODO
+*TO DO
