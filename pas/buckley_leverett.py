@@ -172,6 +172,25 @@ class BuckleyLeverett():
         
         plt.show()
         
+
+    def plot_relative_permeability(self):
+        """
+        """
+        sw_points = np.linspace(self.residual_w+1.e-3, 1.-self.residual_n, 100)
+        k_rw_points = [self.k_rw(sw_i) for sw_i in sw_points]
+        k_rn_points = [self.k_rn(sw_i) for sw_i in sw_points]
+        
+
+        plt.plot(sw_points, k_rw_points)
+        plt.plot(sw_points, k_rn_points)
+
+        plt.plot([1.-self.residual_n, 1.-self.residual_n], [0., self.k_rw(1.-self.residual_n)], 'k--')
+        plt.plot([self.residual_w, self.residual_w], [0., self.k_rn(self.residual_w)],'k--' )
+
+        plt.xlim([0., 1.])
+
+        plt.show()
+        
     def plot_fractional_flow_prime(self):
         """
         """
@@ -191,17 +210,26 @@ class BuckleyLeverett():
         ## the second derivative is negative. 
         sw_start = 1.-self.residual_n 
         sw_end = self.residual_w
+
         found_start = False
+        is_linear = True
+        
         for sw in np.arange(self.residual_w+1.e-10, 1.-self.residual_n, .001):
+            if abs(fractional_flow_prime_prime(sw)) > 1.e-3:
+                is_linear = False
             if fractional_flow_prime_prime(sw) < -1.e-2 and sw < sw_start: 
                 sw_start = sw
             if fractional_flow_prime_prime(sw) < -1.e-2 and sw > sw_end: 
                 sw_end = sw
-            
-        (_, sw_at_front) = min(map(lambda sw:(abs(fractional_flow_prime(sw)-fractional_flow(sw)/sw), sw), 
-                                   np.arange(sw_start, 
-                                             sw_end, 
-                                             .0001)))
+
+        if is_linear:
+            sw_at_front = 1.-self.residual_n
+
+        else:            
+            (_, sw_at_front) = min(map(lambda sw:(abs(fractional_flow_prime(sw)-fractional_flow(sw)/sw), sw), 
+                                       np.arange(sw_start, 
+                                                 sw_end, 
+                                                 .0001)))
         
         return sw_at_front
 
@@ -254,7 +282,6 @@ class BuckleyLeverett():
         """
         fractional_flow = self.construct_fractional_flow()
         fractional_flow_prime = self.construct_fractional_flow_prime()
-
 
         sw_at_front = self.sw_at_front(fractional_flow, fractional_flow_prime)
 
