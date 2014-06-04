@@ -172,13 +172,37 @@ class BuckleyLeverett():
         
         plt.show()
         
+    def plot_fractional_flow_prime(self):
+        """
+        """
+        fractional_flow_prime = self.construct_fractional_flow_prime()
+        x = np.linspace(self.residual_w+1.e-3, 1.-self.residual_n, 100)
+        y = [fractional_flow_prime(x_i) for x_i in x]
+        plt.plot(x, y, 'k')
+        plt.show()
+
     def sw_at_front(self, fractional_flow, fractional_flow_prime):
         """ Find the saturation at the front. 
         """
+        
+        fractional_flow_prime_prime = self.construct_fractional_flow_prime_prime()
+        
+        ## Find the sw range to search in. This is done using the region 
+        ## the second derivative is negative. 
+        sw_start = 1.-self.residual_n 
+        sw_end = self.residual_w
+        found_start = False
+        for sw in np.arange(self.residual_w+1.e-10, 1.-self.residual_n, .001):
+            if fractional_flow_prime_prime(sw) < -1.e-2 and sw < sw_start: 
+                sw_start = sw
+            if fractional_flow_prime_prime(sw) < -1.e-2 and sw > sw_end: 
+                sw_end = sw
+            
         (_, sw_at_front) = min(map(lambda sw:(abs(fractional_flow_prime(sw)-fractional_flow(sw)/sw), sw), 
-                                   np.arange(self.residual_w+.01, 
-                                             1.-self.residual_n, 
+                                   np.arange(sw_start, 
+                                             sw_end, 
                                              .0001)))
+        
         return sw_at_front
 
     def construct_fractional_flow(self):
@@ -204,6 +228,22 @@ class BuckleyLeverett():
     
         return fractional_flow_prime
 
+    def construct_fractional_flow_prime_prime(self):
+        """ Builds fractional flow  derivative function from 
+        parameters of problem. 
+        """
+        fractional_flow = self.construct_fractional_flow()
+        
+        def fractional_flow_prime_prime(sw):
+            h = .0001
+            f_prime = fractional_flow(sw+h)
+            f_prime -=2.*fractional_flow(sw)
+            f_prime += fractional_flow(sw-h)
+            f_prime /= h**2
+            return f_prime
+        
+        return fractional_flow_prime_prime
+
     def saturation_solution(self, time):
         """ Returns the Buckley-Leverett solution 
         for two-phase problems. The functions gives the wetting phase 
@@ -214,6 +254,7 @@ class BuckleyLeverett():
         """
         fractional_flow = self.construct_fractional_flow()
         fractional_flow_prime = self.construct_fractional_flow_prime()
+
 
         sw_at_front = self.sw_at_front(fractional_flow, fractional_flow_prime)
 
