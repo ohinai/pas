@@ -7,17 +7,6 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Polygon
 
 
-def rescale_relative_perm(k_r, residual_w, residual_n):
-    """ Takes a relative permeability function from [0,1] and 
-    rescales it to [residual_w, 1-residual_n]. 
-    """
-    def new_k_r(sw):
-        se = sw-residual_w 
-        se /= 1.-residual_w-residual_n
-        return k_r(se)
-
-    return new_k_r
-
 class BuckleyLeverett():
     """ Solves the two-phase flow problem using the Buckley-Leverett 
     solution. 
@@ -52,6 +41,9 @@ class BuckleyLeverett():
         
         ## Minimum non-wetting phase residual. 
         self.residual_n = 0.
+        
+        ## Initial saturation. 
+        self.initial_sw = 0.
         
         ## Non-wetting phase relative permeability
         self.k_rn = None
@@ -146,9 +138,9 @@ class BuckleyLeverett():
             x = [x/100.*front for x in range(100)]+[front]
             y = [solution(x_i) for x_i in x]
             x += [front]
-            y += [0.]
+            y += [self.initial_sw]
             x += [self.length]
-            y += [0.]
+            y += [self.initial_sw]
 
         else:
             x = [x/100.*self.length for x in range(100)]+[self.length]
@@ -230,7 +222,6 @@ class BuckleyLeverett():
                                        np.arange(sw_start, 
                                                  sw_end, 
                                                  .0001)))
-        
         return sw_at_front
 
     def construct_fractional_flow(self):
@@ -307,7 +298,7 @@ class BuckleyLeverett():
             if point<=x_front:
                 return saturation_before_front(point)
             else:
-                return 0.
+                return self.initial_sw
 
         return (bl_solution, x_front)
 
