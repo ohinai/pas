@@ -8,13 +8,13 @@ import os
 from multiprocessing import Pool
 import itertools
 
-def gaver_stehfest(t, P):
-    """ Performs a numerical inversion 
-    of the Laplace transform using the 
-    Gaver-Stehfest algorithm. The algorithm 
+def gaver_stehfest(time, lap_func):
+    """ Performs a numerical inversion
+    of the Laplace transform using the
+    Gaver-Stehfest algorithm. The algorithm
     can be found in:
     "A Uninfied Framework for Numerically Inverting Laplace
-    Transforms" By Joseph Abate and Ward Whitt. 
+    Transforms" By Joseph Abate and Ward Whitt.
     """
     def nCr(n, r):
         return math.factorial(n)/(math.factorial(r)*
@@ -29,12 +29,12 @@ def gaver_stehfest(t, P):
             summation += current_summation
         return summation*pow(-1, n+k)
     n = 7
-    total_sum = a(1, n)*P(1.*np.log(2.)/t)
+    total_sum = a(1, n)*lap_func(1.*np.log(2.)/time)
     for k in range(2, 2*n+1):
-        total_sum += a(k, n)*P(k*np.log(2.)/t)
-    return total_sum*np.log(2.)/t
+        total_sum += a(k, n)*lap_func(k*np.log(2.)/time)
+    return total_sum*np.log(2.)/time
     
-def CincoleyMeng():
+class CincoleyMeng():
     """ Computes the semi-anlytical solution from 
     Cinco Ley and Meng:
     "Pressure Transient Analysis of Wells With Finite Conductivity 
@@ -51,17 +51,26 @@ def CincoleyMeng():
     q_D = \frac{2 q_f}{q_w}
     """
     def __init__(self):
-        
-        self.c_fd = None
-        self.fracture_length = 1.
-        self.fracture_width = .01
-        self.fracture_k = 1.
-        self.reservoir_k = 1.
-        self.viscosity = 1000.
-        
-        self.number_of_segments = 20
 
-    def pressure_leakage_at_t_d(self, t_d):
+        self.param = {
+            ## Reservoir permeability (m^2).
+            "res_k":1.e-3,
+            ## Fracture permeability. 
+            "frac_k":1.,
+            ## Fracture length (m).
+            "frac_length":1.,
+            ## Fracture width (m). 
+            "frac_width":.01,
+            ## Fluid viscosity (Pa s). 
+            "viscosity":1.e-3, 
+            ## Reservoir porosity. 
+            "res_porosity":1.,
+            ## Compressibility (Pa^-1). 
+            "compressibility":1.e-8}
+
+        self.number_of_segments = 40
+
+    def pressure_leakage_at_t(self, time):
         """ Computes fracture leakage and bottom hole pressure at non-dimensional time t_d. 
         
         :param float t_d: Non-dimensional time. 
@@ -71,121 +80,65 @@ def CincoleyMeng():
         semi-analytical solution. The second entry in the tuple is the bottom 
         hole pressure at that time. 
         """
-        x_D = [float(i)/self.number_of_segments for i in range(self.number_of_segments)]
+        t_d = self.param["res_k"]*time
+        t_d /= self.param["res_porosity"]
+        t_d /= self.param["viscosity"]
+        t_d /= self.param["compressibility"]
+        t_d /= self.param["frac_length"]**2
 
-        delta_x = 1./self.number_of_segments
+        x_d = np.array([float(i)/self.number_of_segments for i in range(self.number_of_segments)])
+
+        c_fd = self.param["frac_k"]
+        c_fd *= self.param["frac_width"]
+        c_fd /= self.param["res_k"]
+        c_fd /= self.param["frac_length"]
+        
+        delta_x = 1./float(self.number_of_segments)
 
         def laplace_solution(s):
-            LHS = np.zeros((self.number_of_segments+1, self.number_of_segments+1))
-            RHS = np.zeros(self.number_of_segments+1)
+            lhs = np.zeros((self.number_of_segments+1, self.number_of_segments+1))
+            rhs = np.zeros(self.number_of_segments+1)
             for j in range(self.number_of_segments):
-                x_DJ = x_D[j]+.5*delta_x
-                RHS[j] = np.pi*x_DJ/(self.c_fd*s)
+                x_dj = x_d[j]+.5*delta_x
+                rhs[j] = np.pi*x_dj/(c_fd*s)
                 for i in range(self.number_of_segments):
-                    x_DI = x_D[i]
-                    if x_DJ > x_DI and x_DJ < x_DI+delta_x:
-                        (quad1, error1) = integrate.quad(lambda x: special.kn(0, abs(x_DJ-x)*np.sqrt(s)), 
-                                                         x_DI,
-                                                         x_DI+delta_x,
-                                                         points = [x_DJ], epsrel=1.e-16)
+                    x_di = x_d[i]
+                    if x_dj > x_di and x_dj < x_di+delta_x:
+                        (quad1, error1) = integrate.quad(lambda x: special.kn(0, abs(x_dj-x)*np.sqrt(s)), 
+                                                         x_di,
+                                                         x_di+delta_x,
+                                                         points = [x_dj], epsrel=1.e-16)
                     else:
-                        (quad1, error1) = integrate.quad(lambda x: special.kn(0, abs(x_DJ-x)*np.sqrt(s)), 
-                                                         x_DI,
-                                                         x_DI+delta_x, epsrel=1.e-16)
+                        (quad1, error1) = integrate.quad(lambda x: special.kn(0, abs(x_dj-x)*np.sqrt(s)), 
+                                                         x_di,
+                                                         x_di+delta_x, epsrel=1.e-16)
 
-                    (quad2, error2) = integrate.quad(lambda x: special.kn(0, abs(x_DJ+x)*np.sqrt(s)), 
-                                                     x_DI,
-                                                     x_DI+delta_x, epsrel=1.e-16)
+                    (quad2, error2) = integrate.quad(lambda x: special.kn(0, abs(x_dj+x)*np.sqrt(s)), 
+                                                     x_di,
+                                                     x_di+delta_x, epsrel=1.e-16)
                     #assert (error1 < 1.e-8)
                     #assert (error2 < 1.e-8)
-                    LHS[j, i] += -.5*(quad1+quad2)
+                    lhs[j, i] += -.5*(quad1+quad2)
                     if i < j:
-                        LHS[j, i] += (np.pi/self.c_fd)*((delta_x**2)/2.+
-                                                   (x_DJ-(i+1)*delta_x)*delta_x)
+                        lhs[j, i] += (np.pi/c_fd)*((delta_x**2)/2.+
+                                                   (x_dj-(i+1)*delta_x)*delta_x)
 
-                LHS[j, j] += (np.pi/self.c_fd)*(delta_x**2)/8.
+                lhs[j, j] += (np.pi/c_fd)*(delta_x**2)/8.
 
             for i in range(self.number_of_segments):
-                LHS[i, number_of_segments] += 1.
+                lhs[i, self.number_of_segments] += 1.
 
             for j in range(self.number_of_segments):
-                LHS[number_of_segments, j] += delta_x
+                lhs[self.number_of_segments, j] += delta_x
 
-            RHS[self.number_of_segments] = 1./s
-            solution = np.linalg.solve(LHS, RHS)
-            min_singular_value = np.linalg.svd(LHS)[1][-1]
+            rhs[self.number_of_segments] = 1./s
+            solution = np.linalg.solve(lhs, rhs)
+            min_singular_value = np.linalg.svd(lhs)[1][-1]
             assert(min_singular_value > 1.e-8)
 
             return solution
 
-        full_solution = gaver_stehfest(t_D, laplace_solution)
+        full_solution = gaver_stehfest(t_d, laplace_solution)
 
-        return (full_solution[:-1], full_solution[-1])
+        return (zip(x_d*self.param["frac_length"], full_solution[:-1]), full_solution[-1])
 
-        
-def cinco_ley_laplace(C_fD, t_D, number_of_segments = 20):
-    """ Computes the semi-anlytical solution from 
-    Cinco Ley and Meng:
-    "Pressure Transient Analysis of Wells With Finite Conductivity 
-    Vertical Fractures in Double Porosity Reservoirs"
-    Also see:
-    "Non-Darcy Flow in Wells With Finite-Conductivity 
-    Vertical Fractures. 
-
-    C_fD: Fracture conductivity difined as 
-    (fracture_k*fracture_width)/(reservoir_k*fracture_length)
-
-    t_D = \frac{\Beta res_k t}{\theta c_t \mu x_f^2}
-    p_D = \frac{res_k h [p_i - p(t)]}{\alpha q \Beta \mu}
-    q_D = \frac{2 q_f}{q_w}
-    """
-    x_D = [float(i)/number_of_segments for i in range(number_of_segments)]
-    
-    delta_x = 1./number_of_segments
-
-    def laplace_solution(s):
-        LHS = np.zeros((number_of_segments+1, number_of_segments+1))
-        RHS = np.zeros(number_of_segments+1)
-        for j in range(number_of_segments):
-            x_DJ = x_D[j]+.5*delta_x
-            RHS[j] = np.pi*x_DJ/(C_fD*s)
-            for i in range(number_of_segments):
-                x_DI = x_D[i]
-                if x_DJ > x_DI and x_DJ < x_DI+delta_x:
-                    (quad1, error1) = integrate.quad(lambda x: special.kn(0, abs(x_DJ-x)*np.sqrt(s)), 
-                                                     x_DI,
-                                                     x_DI+delta_x,
-                                                     points = [x_DJ], epsrel=1.e-16)
-                else:
-                    (quad1, error1) = integrate.quad(lambda x: special.kn(0, abs(x_DJ-x)*np.sqrt(s)), 
-                                                     x_DI,
-                                                     x_DI+delta_x, epsrel=1.e-16)
-
-                (quad2, error2) = integrate.quad(lambda x: special.kn(0, abs(x_DJ+x)*np.sqrt(s)), 
-                                                 x_DI,
-                                                 x_DI+delta_x, epsrel=1.e-16)
-                #assert (error1 < 1.e-8)
-                #assert (error2 < 1.e-8)
-                LHS[j, i] += -.5*(quad1+quad2)
-                if i < j:
-                    LHS[j, i] += (np.pi/C_fD)*((delta_x**2)/2.+
-                                               (x_DJ-(i+1)*delta_x)*delta_x)
-                
-            LHS[j, j] += (np.pi/C_fD)*(delta_x**2)/8.
-
-        for i in range(number_of_segments):
-            LHS[i, number_of_segments] += 1.
-
-        for j in range(number_of_segments):
-            LHS[number_of_segments, j] += delta_x
-            
-        RHS[number_of_segments] = 1./s
-        solution = np.linalg.solve(LHS, RHS)
-        min_singular_value = np.linalg.svd(LHS)[1][-1]
-        assert(min_singular_value > 1.e-8)
-
-        return solution
-    
-    full_solution = gaver_stehfest(t_D, laplace_solution)
-
-    return (full_solution[:-1], full_solution[-1])
