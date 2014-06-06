@@ -1,84 +1,81 @@
-
+""" Module for solving and visualizing the Buckley-Leverett solution
+for two-phase flow problems.
+"""
 import numpy as np
-from scipy import sparse, diag
 from scipy import interpolate
 
 import matplotlib.pyplot as plt
 from matplotlib.patches import Polygon
 
-
 class BuckleyLeverett():
-    """ Solves the two-phase flow problem using the Buckley-Leverett 
-    solution. 
+    """ Solves the two-phase flow problem using the Buckley-Leverett
+    solution.
 
-    The code first looks for a df_ds function, finding none is looks 
-    for fractional_flow, and finally it will construct fractional_flow 
-    from the relative permeability and fluid viscosities. 
-    
-    :ivar float cross_section: Domain cross sectional area (m^2). 
-    :ivar float length: Domain length (m). 
-    :ivar float injection_rate: Injection rate (m^3/s). 
-    :ivar float residual_w: Residual saturation for wetting phase. 
-    :ivar float residual_n: Residual saturation for non-wetting phase. 
+    The code first looks for a df_ds function, finding none is looks
+    for fractional_flow, and finally it will construct fractional_flow
+    from the relative permeability and fluid viscosities.
+
+    :ivar float cross_section: Domain cross sectional area (m^2).
+    :ivar float length: Domain length (m).
+    :ivar float injection_rate: Injection rate (m^3/s).
+    :ivar float residual_w: Residual saturation for wetting phase.
+    :ivar float residual_n: Residual saturation for non-wetting phase.
     """
-
     def __init__(self):
-        
-        ## Domain cross sectional area (m^2). 
-        self.cross_section = 1.
 
-        ## Domain length (m)
-        self.length = 1.
+        self.param = {
+            ## Domain cross sectional area (m^2).
+            "cross_section":1.,
+            ## Domain length (m).
+            "length":1.,
+            ## Rock porosity.
+            "porosity":1.,
+            ## Injection rate (m^3/s).
+            "injection_rate":1.,
+            ## Minimum wetting phase residual.
+            "residual_w":0.,
+            ## Minimum non-wetting phase residual.
+            "residual_n":0.,
+            ## Initial saturation.
+            "initial_sw":0.,
+            ## Non-wetting viscosity.
+            "viscosity_n":1.e-3,
+            ## Wetting viscosity.
+            "viscosity_w":1.e-3}
 
-        ## Rock porosity. 
-        self.porosity = 1.
-        
-        ## Injection rate (m^3/s). 
-        self.injection_rate = 1.
-
-        ## Minimum wetting phase residual. 
-        self.residual_w = 0.
-        
-        ## Minimum non-wetting phase residual. 
-        self.residual_n = 0.
-        
-        ## Initial saturation. 
-        self.initial_sw = 0.
-        
-        ## Non-wetting phase relative permeability
-        self.k_rn = None
-
-        ## Wetting phase relative permeability
-        self.k_rw = None 
-        
-        ## Non-wetting viscosity
-        self.viscosity_n = 1.e-3
-
-        ## Wetting viscosity
-        self.viscosity_w = 1.e-3
-
-
-    def find_df_ds_max_by_intergration(self, df_ds):
-        """ Find df_ds max using the original method 
-        proposed by Buckley-Leverett. 
-
-        :param function df_ds: Function representing the derivative 
-        of the fractional flow with respect to saturation. 
-        :return: 
+    def k_rn(self, sw):
+        """ Relative permeability for non-wetting phase. 
+        To be defined by user. 
         """
-        ## Find the half-way point on the curve, the point 
-        ## at which is starts decreasing. This point 
-        ## is located by finding the max value of df_ds. 
+        raise NotImplementedError("k_rn function not defined.")
+
+    def k_rw(self, sw):
+        """ Relative permeability for wetting phase. 
+        To be defined by user. 
+        """
+        raise NotImplementedError("k_rw function not defined.")
+
+    def sw_at_front_intergration(self):
+        """ Alternative method for finding the saturation
+        at the front using integration of the derivative
+        of the fractional flow function.
+
+        :return:
+        """
+        ## Find the half-way point on the curve, the point
+        ## at which is starts decreasing. This point
+        ## is located by finding the max value of df_ds.
         dx = .0001
-        (fw_mid, sw_mid) = max([(df_ds(sw), sw) for \
-                                            sw in np.arange(self.residual_w+1.e-12, 
-                                                            1.-self.residual_n, 
-                                                            dx)])
-        df_ds_data = [(df_ds(sw), sw) for sw in np.arange(self.residual_w+1.e-12, 
-                                                          1.-self.residual_n, 
-                                                          dx)]
-                                          
-        def find_difference_in_volume(f_prime_max):
+        (fw_mid, sw_mid) = max([(self.fractional_flow_p(sw), sw) for \
+                                    sw in np.arange(self.param["residual_w"]+1.e-12,
+                                                    1.-self.param["residual_n"],
+                                                    dx)])
+        df_ds_data = [(self.fractional_flow_p(sw), sw) \
+                          for sw in np.arange(self.param["residual_w"]+1.e-12,
+                                              1.-self.param["residual_n"],
+                                              dx)]
+
+        def areas_at_f_prime(f_prime_max):
             integral_1 = 0.
             integral_2 = 0.
             sw_max = 0.
@@ -93,204 +90,228 @@ class BuckleyLeverett():
             integral_1 = f_prime_max*sw_max - integral_1*dx
             integral_2 *= dx
             integral_2 -= f_prime_max*(sw_max_2-sw_max)
-            
+
             return (abs(integral_1-integral_2), sw_max, sw_max_2)
 
         current_min = 1000.
-        current_sw = 0.
-        plt.plot([x[1] for x in df_ds_data], [x[0] for x in df_ds_data], 'k')
-        plt.show()
+        sw_at_front = 0.
+
         for (f_p, sw) in df_ds_data:
-            if sw >sw_mid:
-                (diff, current_sw1, current_sw2) = find_difference_in_volume(f_p)
+            if sw > sw_mid:
+                (diff, current_sw1, current_sw2) = areas_at_f_prime(f_p)
                 if diff < current_min:
-                    current_sw = sw
+                    sw_at_front = sw
                     current_min = diff
                     sw1 = current_sw1
                     sw2 = current_sw2
-                    
+
         fig, ax = plt.subplots()
 
         plt.plot([x[1] for x in df_ds_data], [x[0] for x in df_ds_data], 'k')
-        plt.plot([sw_mid, current_sw], [fw_mid, df_ds(current_sw)], 'ro')
-        plt.plot([sw1], [df_ds(sw1)], 'ro')
-        
-        verts1 = [ (x[1], x[0]) for x in filter(lambda x:x[1]<sw1, df_ds_data)]
-        verts1 += [(sw1, df_ds(sw1)), (0., df_ds(current_sw)), (0.,0.)]
+        plt.plot([sw_mid], [fw_mid], 'ro')
+        plt.plot([sw_at_front], [self.fractional_flow_p(sw_at_front)], 'ro')
+        plt.plot([sw1], [self.fractional_flow_p(sw1)], 'ro')
+
+        verts1 = []
+        for (f_p, sw) in df_ds_data:
+            if sw < sw1:
+                verts1.append((sw, f_p))
+
+        verts1 += [(sw1, self.fractional_flow_p(sw1)),
+                   (0., self.fractional_flow_p(sw_at_front)), (0.,0.)]
         fill1 = Polygon(verts1, facecolor='0.9', edgecolor='0.5')
         ax.add_patch(fill1)
 
-        verts2 = [ (x[1], x[0]) for x in filter(lambda x:x[1]>sw1 and x[1]<sw2, df_ds_data)]
+        verts2 = []
+        for (f_p, sw) in df_ds_data:
+            if sw > sw1 and sw < sw2:
+                verts2.append((sw, f_p))
+
         fill2 = Polygon(verts2, facecolor='0.9', edgecolor='0.5')
         ax.add_patch(fill2)
 
         plt.grid(True)
         plt.show()
 
-    def plot_saturation_at_t(self, time):
-        """
-        """
-        (solution, front)= self.saturation_solution(time)
+        return sw_at_front
 
-        print "front", front
-        
-        if front < self.length:
-            x = [x/100.*front for x in range(100)]+[front]
-            y = [solution(x_i) for x_i in x]
-            x += [front]
-            y += [self.initial_sw]
-            x += [self.length]
-            y += [self.initial_sw]
+    def plot_saturation_at_t(self, time_list):
+        """ Plots the Buckley-Leverett solution at the different times
+        listed in time_list.
 
-        else:
-            x = [x/100.*self.length for x in range(100)]+[self.length]
-            y = [solution(x_i) for x_i in x]
-            
-        plt.plot(x, y, 'k')
+        :param list time_list: List of times to solve for. The different
+        plots will be plotted in a single graph.
+        :return: None
+        """
+        for time in time_list:
+            (solution, front)= self.saturation_solution(time)
+            if front < self.param["length"]:
+                x_axis = [x/100.*front for x in range(100)]+[front]
+                y_axis = [solution(x_i) for x_i in x_axis]
+                x_axis += [front]
+                y_axis += [self.param["initial_sw"]]
+                x_axis += [self.param["length"]]
+                y_axis += [self.param["initial_sw"]]
+
+            else:
+                x_axis = [x/100.*self.param["length"] for x in range(100)]
+                x_axis += [self.param["length"]]
+                y_axis = [solution(x_i) for x_i in x_axis]
+
+            plt.plot(x_axis, y_axis, 'k')
+
         plt.show()
 
     def plot_fractional_flow(self, show_sw_at_front = False):
+        """ Plots the fractional flow curve based on the
+        problem parameters given.
+
+        :param bool show_sw_at_front: Draws a circle at the
+        saturation calculated at the front.
+        :return: None
         """
-        """
-        fractional_flow = self.construct_fractional_flow()
-        x = np.linspace(self.residual_w+1.e-3, 1.-self.residual_n, 100)
-        y = [fractional_flow(x_i) for x_i in x]
-        plt.plot(x, y, 'k')
+        x_axis = np.linspace(self.param["residual_w"]+1.e-3, 
+                             1.-self.param["residual_n"], 100)
+        y_axis = [self.fractional_flow(x_i) for x_i in x_axis]
+        plt.plot(x_axis, y_axis, 'k')
 
         if show_sw_at_front:
-            fractional_flow_prime = self.construct_fractional_flow_prime()
-            sw_at_front = self.sw_at_front(fractional_flow, fractional_flow_prime)
-            plt.plot([sw_at_front], [fractional_flow(sw_at_front)], "ro")
-        
+            sw_at_front = self.sw_at_front()
+            plt.plot([sw_at_front], [self.fractional_flow(sw_at_front)], "ro")
+
         plt.show()
-        
 
     def plot_relative_permeability(self):
+        """ Plots the relative permeability curves for the wetting
+        and non-wetting phases.
         """
-        """
-        sw_points = np.linspace(self.residual_w+1.e-3, 1.-self.residual_n, 100)
+        sw_points = np.linspace(self.param["residual_w"]+1.e-3, 
+                                1.-self.param["residual_n"], 100)
         k_rw_points = [self.k_rw(sw_i) for sw_i in sw_points]
         k_rn_points = [self.k_rn(sw_i) for sw_i in sw_points]
-        
 
         plt.plot(sw_points, k_rw_points)
         plt.plot(sw_points, k_rn_points)
 
-        plt.plot([1.-self.residual_n, 1.-self.residual_n], [0., self.k_rw(1.-self.residual_n)], 'k--')
-        plt.plot([self.residual_w, self.residual_w], [0., self.k_rn(self.residual_w)],'k--' )
+        plt.plot([1.-self.param["residual_n"], 
+                  1.-self.param["residual_n"]], \
+                     [0., self.k_rw(1.-self.param["residual_n"])], 'k--')
+        plt.plot([self.param["residual_w"], self.param["residual_w"]], \
+                     [0., self.k_rn(self.param["residual_w"])],'k--' )
 
         plt.xlim([0., 1.])
 
         plt.show()
-        
-    def plot_fractional_flow_prime(self):
+
+    def plot_fractional_flow_p(self):
+        """ Plots the derivative of fractional flow
+        with respect to saturation (df_ds).
         """
-        """
-        fractional_flow_prime = self.construct_fractional_flow_prime()
-        x = np.linspace(self.residual_w+1.e-3, 1.-self.residual_n, 100)
-        y = [fractional_flow_prime(x_i) for x_i in x]
-        plt.plot(x, y, 'k')
+        x_axis = np.linspace(self.param["residual_w"]+1.e-3, 
+                             1.-self.param["residual_n"], 100)
+        y_axis = [self.fractional_flow_p(x_i) for x_i in x_axis]
+        plt.plot(x_axis, y_axis, 'k')
         plt.show()
 
-    def sw_at_front(self, fractional_flow, fractional_flow_prime):
-        """ Find the saturation at the front. 
+    def sw_at_front(self):
+        """ Find the saturation at the front.
         """
-        
-        fractional_flow_prime_prime = self.construct_fractional_flow_prime_prime()
-        
-        ## Find the sw range to search in. This is done using the region 
-        ## the second derivative is negative. 
-        sw_start = 1.-self.residual_n 
-        sw_end = self.residual_w
+        ## Find the sw range to search in. This is done using the region
+        ## the second derivative is negative.
+        sw_start = 1.-self.param["residual_n"]
+        sw_end = self.param["residual_w"]
 
-        found_start = False
         is_linear = True
-        
-        for sw in np.arange(self.residual_w+1.e-10, 1.-self.residual_n, .001):
-            if abs(fractional_flow_prime_prime(sw)) > 1.e-3:
+
+        for sw in np.arange(self.param["residual_w"]+1.e-10, 
+                            1.-self.param["residual_n"], .001):
+            if abs(self.fractional_flow_p_p(sw)) > 1.e-3:
                 is_linear = False
-            if fractional_flow_prime_prime(sw) < -1.e-2 and sw < sw_start: 
+            if self.fractional_flow_p_p(sw) < -1.e-2 and sw < sw_start:
                 sw_start = sw
-            if fractional_flow_prime_prime(sw) < -1.e-2 and sw > sw_end: 
+            if self.fractional_flow_p_p(sw) < -1.e-2 and sw > sw_end:
                 sw_end = sw
 
         if is_linear:
-            sw_at_front = 1.-self.residual_n
+            sw_at_front = 1.-self.param["residual_n"]
 
-        else:            
-            (_, sw_at_front) = min(map(lambda sw:(abs(fractional_flow_prime(sw)-fractional_flow(sw)/sw), sw), 
-                                       np.arange(sw_start, 
-                                                 sw_end, 
-                                                 .0001)))
+        else:
+            sw_at_front = 0.
+            current_min = 1000.
+            for sw in np.arange(sw_start, sw_end, .0001):
+                current_diff = abs(self.fractional_flow_p(sw)-\
+                                       self.fractional_flow(sw)/sw)
+                if current_diff < current_min:
+                    sw_at_front = sw
+                    current_min = current_diff
+
         return sw_at_front
 
-    def construct_fractional_flow(self):
-        """ Builds fractional flow function from 
-        parameters of problem. 
-        """
-        def fractional_flow(sw):
-            return 1./(1.+self.k_rn(sw)/self.k_rw(sw)*\
-                           self.viscosity_n/self.viscosity_w)
-        return fractional_flow
+    def fractional_flow(self, sw):
+        """ Returns fractional flow function from
+        parameters of problem.
 
-    def construct_fractional_flow_prime(self):
-        """ Builds fractional flow  derivative function from 
-        parameters of problem. 
+        :param float sw: Saturation of wetting phase.
+        :return: float
         """
-        fractional_flow = self.construct_fractional_flow()
-        
-        def fractional_flow_prime(sw):
-            f_prime = fractional_flow(sw+.0001)
-            f_prime -=fractional_flow(sw)
-            f_prime /= .0001
-            return f_prime
-    
-        return fractional_flow_prime
+        return 1./(1.+self.k_rn(sw)/self.k_rw(sw)*\
+                       self.parameter["viscosity_n"]/self.parameter["viscosity_w"])
 
-    def construct_fractional_flow_prime_prime(self):
-        """ Builds fractional flow  derivative function from 
-        parameters of problem. 
+    def fractional_flow_p(self, sw):
+        """ Returns the fractional flow derivative function from
+        parameters of problem.
+        
+        :param float sw: Saturation of wetting phase.
+        :return: float
         """
-        fractional_flow = self.construct_fractional_flow()
-        
-        def fractional_flow_prime_prime(sw):
-            h = .0001
-            f_prime = fractional_flow(sw+h)
-            f_prime -=2.*fractional_flow(sw)
-            f_prime += fractional_flow(sw-h)
-            f_prime /= h**2
-            return f_prime
-        
-        return fractional_flow_prime_prime
+        f_prime = self.fractional_flow(sw+.0001)
+        f_prime -= self.fractional_flow(sw)
+        f_prime /= .0001
+        return f_prime
+
+    def fractional_flow_p_p(self, sw):
+        """ Returns the fractional flow  second derivative function from
+        parameters of problem.
+
+        :param float sw: Saturation of wetting phase.
+        :return: float
+        """
+        h = .0001
+        f_prime = self.fractional_flow(sw+h)
+        f_prime -=2.*self.fractional_flow(sw)
+        f_prime += self.fractional_flow(sw-h)
+        f_prime /= h**2
+        return f_prime
 
     def saturation_solution(self, time):
-        """ Returns the Buckley-Leverett solution 
-        for two-phase problems. The functions gives the wetting phase 
-        saturation at the time (s) specified in the input. 
+        """ Returns the Buckley-Leverett solution
+        for two-phase problems. The functions gives the wetting phase
+        saturation at the time (s) specified in the input.
         :param float time: Time (s) after injection.
         :return: A function representing the wetting phase saturation at x \
-        (distance from injector in meters). 
+        (distance from injector in meters).
         """
-        fractional_flow = self.construct_fractional_flow()
-        fractional_flow_prime = self.construct_fractional_flow_prime()
+        sw_at_front = self.sw_at_front()
 
-        sw_at_front = self.sw_at_front(fractional_flow, fractional_flow_prime)
+        fractional_flow_p_at_front = self.fractional_flow_p(sw_at_front)
 
-        fractional_flow_prime_at_front = fractional_flow_prime(sw_at_front)
+        front_v = time
+        front_v *= self.parameter["injection_rate"]
+        front_v /= self.parameter["porosity"]*self.parameter["cross_section"]
 
-        v = time*self.injection_rate/(self.porosity*self.cross_section)
-        
-        x_front = v*fractional_flow_prime(sw_at_front)
+        x_front = front_v*self.fractional_flow_p(sw_at_front)
 
-        # Compute sw as a function of x. This is done by 
-        # interpolating over sw, and finding f_prime, 
-        # then scaling f_prime properly to cover x. 
-        inter_y = [1.-self.residual_n]+list(np.arange(1.-self.residual_n, sw_at_front, -.001))+[sw_at_front]
+        # Compute sw as a function of x. This is done by
+        # interpolating over sw, and finding f_prime,
+        # then scaling f_prime properly to cover x.
+        inter_y = [1.-self.parameter["residual_n"]]
+        inter_y += list(np.arange(1.-self.parameter["residual_n"], sw_at_front, -.001))
+        inter_y += [sw_at_front]
         inter_x = [0.]
-        inter_x += map(lambda sw: fractional_flow_prime(sw), 
-                      np.arange(1.-self.residual_n, sw_at_front, -.001))
-        inter_x += [fractional_flow_prime(sw_at_front)]
-        inter_x = map(lambda x:x/fractional_flow_prime_at_front*x_front, inter_x)
+        inter_x += [self.fractional_flow_p(sw) for sw in \
+                      np.arange(1.-self.parameter["residual_n"], sw_at_front, -.001)]
+        inter_x += [self.fractional_flow_p(sw_at_front)]
+        inter_x = [x/fractional_flow_p_at_front*x_front for x in  inter_x]
 
         saturation_before_front = interpolate.interp1d(inter_x, inter_y)
 
@@ -298,7 +319,7 @@ class BuckleyLeverett():
             if point<=x_front:
                 return saturation_before_front(point)
             else:
-                return self.initial_sw
+                return self.parameter["initial_sw"]
 
         return (bl_solution, x_front)
 
