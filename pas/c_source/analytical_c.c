@@ -21,7 +21,6 @@ analytical_pointsource_all_d(PyObject *self, PyObject *args)
     a, b, d, 
     n_max, m_max, w_max 
    */
-
     double pressure;
     double n_x, n_y, n_z;
     double x_well, y_well, z_well;
