@@ -7,9 +7,6 @@
 
 #include <Python.h>
 
-
-#define PI 3.141592653		
-
 static PyObject *
 analytical_pointsource_all_d(PyObject *self, PyObject *args)
 {
@@ -49,18 +46,18 @@ analytical_pointsource_all_d(PyObject *self, PyObject *args)
     pressure = 0.;
 
     for (n=1; n<n_max; n++){
-      current_n = sin(n*PI*x_in/a);
-      current_n *= sin(n*PI*x_well/a);
-      pow_pi_n_a = pow(PI*n/a,2)*n_x;
+      current_n = sin(n*M_PI*x_in/a);
+      current_n *= sin(n*M_PI*x_well/a);
+      pow_pi_n_a = pow(M_PI*n/a,2)*n_x;
       for (m=1; m<m_max; m++){
-	current_n_m = current_n*sin(m*PI*y_in/b);
-	current_n_m *= sin(m*PI*y_well/b);
-	pow_pi_m_b = pow(PI*m/b,2)*n_y;
+	current_n_m = current_n*sin(m*M_PI*y_in/b);
+	current_n_m *= sin(m*M_PI*y_well/b);
+	pow_pi_m_b = pow(M_PI*m/b,2)*n_y;
 	for (w=1; w<w_max; w++){
-	  current_value = current_n_m*sin(w*PI*z_in/d);
-	  current_value *= sin(w*PI*z_well/d);
-	  current_value /= pow_pi_n_a+pow_pi_m_b+pow(PI*w/d,2)*n_z;
-	  current_value *= -exp(-t_in*(pow_pi_n_a+pow_pi_m_b+pow(PI*w/d,2)*n_z))+1.;
+	  current_value = current_n_m*sin(w*M_PI*z_in/d);
+	  current_value *= sin(w*M_PI*z_well/d);
+	  current_value /= pow_pi_n_a+pow_pi_m_b+pow(M_PI*w/d,2)*n_z;
+	  current_value *= -exp(-t_in*(pow_pi_n_a+pow_pi_m_b+pow(M_PI*w/d,2)*n_z))+1.;
 	  pressure += current_value;
 	}
       }
@@ -112,27 +109,27 @@ analytical_pointsource_all_n(PyObject *self, PyObject *args)
     pressure = 0.;
 
     for (n=0; n<n_max; n++){
-      current_n = cos(n*PI*x_in/a);
-      current_n *= cos(n*PI*x_well/a);
+      current_n = cos(n*M_PI*x_in/a);
+      current_n *= cos(n*M_PI*x_well/a);
       if (n==0) 
 	current_n *= .5 ;
-      pow_pi_n_a = pow(PI*n/a,2)*n_x;
+      pow_pi_n_a = pow(M_PI*n/a,2)*n_x;
       for (m=0; m<m_max; m++){
-	current_n_m = current_n*cos(m*PI*y_in/b);
-	current_n_m *= cos(m*PI*y_well/b);
+	current_n_m = current_n*cos(m*M_PI*y_in/b);
+	current_n_m *= cos(m*M_PI*y_well/b);
 	if (m==0)
 	  current_n_m *= .5;
-	pow_pi_m_b = pow(PI*m/b,2)*n_y;
+	pow_pi_m_b = pow(M_PI*m/b,2)*n_y;
 	for (w=0; w<w_max; w++){
-	  current_value = current_n_m*cos(w*PI*z_in/d);
-	  current_value *= cos(w*PI*z_well/d);
+	  current_value = current_n_m*cos(w*M_PI*z_in/d);
+	  current_value *= cos(w*M_PI*z_well/d);
 	  if (w==0)
 	    current_value *= .5;
 	  if (n==0 && m == 0 && w == 0)
 	    pressure += current_value*t_in;
 	  else{
-	    current_value /= pow_pi_n_a+pow_pi_m_b+pow(PI*w/d,2)*n_z;
-	    current_value *= -exp(-t_in*(pow_pi_n_a+pow_pi_m_b+pow(PI*w/d,2)*n_z))+1.;
+	    current_value /= pow_pi_n_a+pow_pi_m_b+pow(M_PI*w/d,2)*n_z;
+	    current_value *= -exp(-t_in*(pow_pi_n_a+pow_pi_m_b+pow(M_PI*w/d,2)*n_z))+1.;
 	    pressure += current_value;
 	  }
 	}
@@ -164,7 +161,7 @@ analytical_cincoley_sum_1(PyObject *self, PyObject *args)
   long int n; 
   double summation = 0.;
   for (n=1; n<n_max; n++){
-    summation += 1./(n*n)*(1.-exp(-PI*PI*n*n*eta_fD*t_DK))*cos(n*PI*x_DJ);
+    summation += 1./(n*n)*(1.-exp(-M_PI*M_PI*n*n*eta_fD*t_DK))*cos(n*M_PI*x_DJ);
   }
   return Py_BuildValue("d", summation);
 }
@@ -200,11 +197,11 @@ analytical_cincoley_sum_2(PyObject *self, PyObject *args)
   double current_entry; 
   for (n=1; n<n_max; n++){
     current_entry = 1./(n*n*n);
-    current_entry *= (exp(-PI*PI*n*n*eta_fD*delta_t_K_l)-\
-		      exp(-PI*PI*n*n*eta_fD*delta_t_K_l_min1)); 
-    current_entry *= cos(n*PI*x_DJ);
-    current_entry *= cos(n*PI*x_DI);
-    current_entry *= sin(n*PI/(2.*N));
+    current_entry *= (exp(-M_PI*M_PI*n*n*eta_fD*delta_t_K_l)-\
+		      exp(-M_PI*M_PI*n*n*eta_fD*delta_t_K_l_min1)); 
+    current_entry *= cos(n*M_PI*x_DJ);
+    current_entry *= cos(n*M_PI*x_DI);
+    current_entry *= sin(n*M_PI/(2.*N));
     summation += current_entry; 
   }
   return Py_BuildValue("d", summation);
